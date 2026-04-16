@@ -16,18 +16,12 @@ const EXPECTED_SYSTEM_CATEGORIES = [
 describe('App bootstrap (e2e)', () => {
   let harness: E2eHarness;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     harness = await createE2eHarness();
   });
 
-  afterAll(async () => {
-    if (harness) {
-      await harness.stop();
-    }
-  });
-
-  beforeEach(async () => {
-    await harness.resetDatabase();
+  afterEach(async () => {
+    await harness.stop();
   });
 
   it('boots with a disposable PostgreSQL database and seeds the system categories', async () => {

@@ -31,21 +31,21 @@ type SummaryResponse = {
   totalIncome: number;
 };
 
+type ErrorResponse = {
+  error: string;
+  message: string | string[];
+  statusCode: number;
+};
+
 describe('Transactions and summary flows (e2e)', () => {
   let harness: E2eHarness;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     harness = await createE2eHarness();
   });
 
-  afterAll(async () => {
-    if (harness) {
-      await harness.stop();
-    }
-  });
-
-  beforeEach(async () => {
-    await harness.resetDatabase();
+  afterEach(async () => {
+    await harness.stop();
   });
 
   it('covers transaction CRUD, filtered listing, and summary calculations with user isolation', async () => {
@@ -201,5 +201,117 @@ describe('Transactions and summary flows (e2e)', () => {
       totalPages: 1,
     });
     expect(finalList.data).toHaveLength(2);
+  });
+
+  it('rejects invalid categories, mismatched types, and cross-user transaction access', async () => {
+    const server = harness.app.getHttpServer() as Server;
+    const { token } = await harness.createAuthenticatedUser({
+      email: 'negativo@example.com',
+      name: 'Negativo',
+    });
+    const otherUser = await harness.createAuthenticatedUser({
+      email: 'negativo-other@example.com',
+      name: 'Negativo Other',
+    });
+
+    const incomeCategory = await harness.findSystemCategory('Sal\u00e1rio');
+    const expenseCategory = await harness.findSystemCategory(
+      'Alimenta\u00e7\u00e3o',
+    );
+
+    const invalidCategoryResponse = await request(server)
+      .post('/api/transactions')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        amount: 50,
+        categoryId: '00000000-0000-0000-0000-000000000000',
+        description: 'Categoria invalida',
+        type: 'EXPENSE',
+      })
+      .expect(400);
+    const invalidCategoryBody = invalidCategoryResponse.body as ErrorResponse;
+
+    expect(invalidCategoryBody).toMatchObject({
+      error: 'Requisicao invalida',
+      statusCode: 400,
+    });
+
+    const mismatchedTypeResponse = await request(server)
+      .post('/api/transactions')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        amount: 100,
+        categoryId: expenseCategory.id,
+        description: 'Tipo incorreto',
+        type: 'INCOME',
+      })
+      .expect(400);
+    const mismatchedTypeBody = mismatchedTypeResponse.body as ErrorResponse;
+
+    expect(mismatchedTypeBody).toMatchObject({
+      error: 'Requisicao invalida',
+      statusCode: 400,
+    });
+
+    const otherTransactionResponse = await request(server)
+      .post('/api/transactions')
+      .set('Authorization', `Bearer ${otherUser.token}`)
+      .send({
+        amount: 3500,
+        categoryId: incomeCategory.id,
+        description: 'Transacao alheia',
+        type: 'INCOME',
+      })
+      .expect(201);
+    const otherTransaction =
+      otherTransactionResponse.body as TransactionResponse;
+
+    const foreignReadResponse = await request(server)
+      .get(`/api/transactions/${otherTransaction.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404);
+    const foreignReadBody = foreignReadResponse.body as ErrorResponse;
+
+    expect(foreignReadBody).toMatchObject({
+      error: 'Nao encontrado',
+      statusCode: 404,
+    });
+
+    const ownExpenseResponse = await request(server)
+      .post('/api/transactions')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        amount: 80,
+        categoryId: expenseCategory.id,
+        description: 'Despesa propria',
+        type: 'EXPENSE',
+      })
+      .expect(201);
+    const ownExpense = ownExpenseResponse.body as TransactionResponse;
+
+    const invalidUpdateResponse = await request(server)
+      .patch(`/api/transactions/${ownExpense.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        type: 'INCOME',
+      })
+      .expect(400);
+    const invalidUpdateBody = invalidUpdateResponse.body as ErrorResponse;
+
+    expect(invalidUpdateBody).toMatchObject({
+      error: 'Requisicao invalida',
+      statusCode: 400,
+    });
+
+    const foreignDeleteResponse = await request(server)
+      .delete(`/api/transactions/${otherTransaction.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404);
+    const foreignDeleteBody = foreignDeleteResponse.body as ErrorResponse;
+
+    expect(foreignDeleteBody).toMatchObject({
+      error: 'Nao encontrado',
+      statusCode: 404,
+    });
   });
 });

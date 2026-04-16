@@ -12,6 +12,7 @@ import { SummaryTransactionsDto } from './dto/summary-transactions.dto';
 
 @Injectable()
 export class TransactionsService {
+  /* istanbul ignore next -- branch artifact from TS constructor emit */
   constructor(private readonly prisma: PrismaService) {}
 
   async create(userId: string, data: CreateTransactionDto) {

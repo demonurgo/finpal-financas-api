@@ -94,6 +94,8 @@ function setTestEnvironment(databaseUrl: string): () => void {
     JWT_SECRET: process.env.JWT_SECRET,
     NODE_ENV: process.env.NODE_ENV,
     PORT: process.env.PORT,
+    THROTTLE_LIMIT: process.env.THROTTLE_LIMIT,
+    THROTTLE_TTL_MS: process.env.THROTTLE_TTL_MS,
   };
 
   process.env.DATABASE_URL = databaseUrl;
@@ -101,6 +103,8 @@ function setTestEnvironment(databaseUrl: string): () => void {
   process.env.JWT_EXPIRES_IN = '1d';
   process.env.NODE_ENV = 'test';
   process.env.PORT = '0';
+  process.env.THROTTLE_LIMIT = '1000';
+  process.env.THROTTLE_TTL_MS = '60000';
 
   return () => {
     for (const [key, value] of Object.entries(originalValues)) {

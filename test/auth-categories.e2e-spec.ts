@@ -30,21 +30,21 @@ type UserResponse = {
   name: string;
 };
 
+type ErrorResponse = {
+  error: string;
+  message: string | string[];
+  statusCode: number;
+};
+
 describe('Auth and categories flows (e2e)', () => {
   let harness: E2eHarness;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     harness = await createE2eHarness();
   });
 
-  afterAll(async () => {
-    if (harness) {
-      await harness.stop();
-    }
-  });
-
-  beforeEach(async () => {
-    await harness.resetDatabase();
+  afterEach(async () => {
+    await harness.stop();
   });
 
   it('registers, logs in, returns the current user, and rejects protected access without a token', async () => {
@@ -91,6 +91,44 @@ describe('Auth and categories flows (e2e)', () => {
       email: registerPayload.email,
       id: registerBody.id,
       name: registerPayload.name,
+    });
+  });
+
+  it('rejects duplicate registration and invalid login attempts', async () => {
+    const server = harness.app.getHttpServer() as Server;
+    const registerPayload = {
+      email: 'duplicado@example.com',
+      name: 'Usuario Duplicado',
+      password: 'strongPassword123',
+    };
+
+    await request(server)
+      .post('/api/auth/register')
+      .send(registerPayload)
+      .expect(201);
+
+    const duplicateRegisterResponse = await request(server)
+      .post('/api/auth/register')
+      .send(registerPayload)
+      .expect(409);
+    const duplicateRegisterBody =
+      duplicateRegisterResponse.body as ErrorResponse;
+
+    expect(duplicateRegisterBody.statusCode).toBe(409);
+    expect(duplicateRegisterBody.error).toBe('Conflito');
+
+    const invalidLoginResponse = await request(server)
+      .post('/api/auth/login')
+      .send({
+        email: registerPayload.email,
+        password: 'senha-errada',
+      })
+      .expect(401);
+    const invalidLoginBody = invalidLoginResponse.body as ErrorResponse;
+
+    expect(invalidLoginBody).toMatchObject({
+      error: 'Nao autorizado',
+      statusCode: 401,
     });
   });
 
@@ -168,5 +206,54 @@ describe('Auth and categories flows (e2e)', () => {
     expect(
       finalCategories.some((category) => category.name === 'Projetos'),
     ).toBe(false);
+  });
+
+  it('rejects system-category mutations and foreign-category mutations', async () => {
+    const server = harness.app.getHttpServer() as Server;
+    const { token } = await harness.createAuthenticatedUser({
+      email: 'cat-owner@example.com',
+      name: 'Categoria Owner',
+    });
+    const otherUser = await harness.createAuthenticatedUser({
+      email: 'cat-other@example.com',
+      name: 'Categoria Other',
+    });
+
+    const systemCategory = await harness.findSystemCategory('Sal\u00e1rio');
+
+    const customCategoryResponse = await request(server)
+      .post('/api/categories')
+      .set('Authorization', `Bearer ${otherUser.token}`)
+      .send({
+        name: 'Investimentos',
+        type: 'INCOME',
+      })
+      .expect(201);
+    const customCategory = customCategoryResponse.body as CategoryResponse;
+
+    const systemUpdateResponse = await request(server)
+      .patch(`/api/categories/${systemCategory.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Nao pode',
+      })
+      .expect(403);
+    const systemUpdateBody = systemUpdateResponse.body as ErrorResponse;
+
+    expect(systemUpdateBody).toMatchObject({
+      error: 'Proibido',
+      statusCode: 403,
+    });
+
+    const foreignDeleteResponse = await request(server)
+      .delete(`/api/categories/${customCategory.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404);
+    const foreignDeleteBody = foreignDeleteResponse.body as ErrorResponse;
+
+    expect(foreignDeleteBody).toMatchObject({
+      error: 'Nao encontrado',
+      statusCode: 404,
+    });
   });
 });
