@@ -34,4 +34,14 @@ describe('Docker hardening files', () => {
       'SEED_SAMPLE_DATA deve permanecer false em producao.',
     );
   });
+
+  it('lets Docker Compose inherit NODE_ENV from the environment file', () => {
+    const composeFile = readFileSync(
+      join(process.cwd(), 'docker-compose.yml'),
+      'utf-8',
+    );
+
+    expect(composeFile).toContain('NODE_ENV: ${NODE_ENV:-development}');
+    expect(composeFile).not.toContain('NODE_ENV: production');
+  });
 });

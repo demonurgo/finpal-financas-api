@@ -37,6 +37,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
       [HttpStatus.FORBIDDEN]: 'Proibido',
       [HttpStatus.NOT_FOUND]: 'Nao encontrado',
       [HttpStatus.CONFLICT]: 'Conflito',
+      [HttpStatus.TOO_MANY_REQUESTS]: 'Muitas requisicoes',
+      [HttpStatus.SERVICE_UNAVAILABLE]: 'Servico indisponivel',
       [HttpStatus.INTERNAL_SERVER_ERROR]: 'Erro interno do servidor',
     };
     return names[status] || 'Erro';

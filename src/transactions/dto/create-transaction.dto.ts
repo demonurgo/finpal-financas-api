@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
 } from 'class-validator';
 import { TransactionType } from '../../generated/prisma/client';
 
@@ -54,7 +55,7 @@ export class CreateTransactionDto {
     description:
       'Identificador de uma categoria compativel do sistema ou do usuario.',
   })
-  @IsString({ message: 'categoryId deve ser um texto' })
+  @IsUUID('4', { message: 'categoryId deve ser um UUID valido' })
   @IsNotEmpty({ message: 'categoryId e obrigatorio' })
   categoryId!: string;
 }

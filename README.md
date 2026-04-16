@@ -79,6 +79,7 @@ npm run docker:up:build
 Acessos:
 
 - Swagger: `http://localhost:3000/api/docs`
+- Healthcheck: `http://localhost:3000/api/health`
 - API: `http://localhost:3000/api`
 
 `GET /api` retorna `404` de propósito. O endpoint existe como prefixo global, não como página inicial.
@@ -166,6 +167,7 @@ curl -X GET "http://localhost:3000/api/categories" \
 | `POST` | `/auth/register` | Criar conta |
 | `POST` | `/auth/login` | Autenticar e obter JWT |
 | `GET` | `/auth/me` | Retornar usuário autenticado |
+| `GET` | `/health` | Verificar saúde da API e do banco |
 | `GET` | `/categories` | Listar categorias do sistema e do usuário |
 | `POST` | `/categories` | Criar categoria personalizada |
 | `PATCH` | `/categories/:id` | Atualizar categoria do usuário |
@@ -179,6 +181,7 @@ curl -X GET "http://localhost:3000/api/categories" \
 
 Rotas públicas:
 
+- `GET /health`
 - `POST /auth/register`
 - `POST /auth/login`
 
