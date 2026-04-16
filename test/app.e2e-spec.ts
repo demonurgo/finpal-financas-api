@@ -1,38 +1,32 @@
+import type { Server } from 'node:http';
 import request from 'supertest';
 import { createE2eHarness, E2eHarness } from './e2e-harness';
 
 const EXPECTED_SYSTEM_CATEGORIES = [
-  'Alimentação',
-  'Educação',
+  'Alimenta\u00e7\u00e3o',
+  'Educa\u00e7\u00e3o',
   'Lazer',
   'Moradia',
   'Outros',
-  'Salário',
-  'Saúde',
+  'Sal\u00e1rio',
+  'Sa\u00fade',
   'Transporte',
 ];
 
 describe('App bootstrap (e2e)', () => {
   let harness: E2eHarness;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     harness = await createE2eHarness();
   });
 
-  afterAll(async () => {
-    if (harness) {
-      await harness.stop();
-    }
-  });
-
-  beforeEach(async () => {
-    await harness.resetDatabase();
+  afterEach(async () => {
+    await harness.stop();
   });
 
   it('boots with a disposable PostgreSQL database and seeds the system categories', async () => {
-    const response = await request(harness.app.getHttpServer())
-      .get('/api/auth/me')
-      .expect(401);
+    const server = harness.app.getHttpServer() as Server;
+    const response = await request(server).get('/api/auth/me').expect(401);
 
     expect(response.body).toMatchObject({
       error: 'Nao autorizado',

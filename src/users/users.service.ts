@@ -8,9 +8,14 @@ export class UsersService {
 
   async create(data: Prisma.UserCreateInput): Promise<Omit<User, 'password'>> {
     const user = await this.prisma.user.create({ data });
-    // Strip the password before returning
-    const { password, ...result } = user;
-    return result;
+
+    return {
+      createdAt: user.createdAt,
+      email: user.email,
+      id: user.id,
+      name: user.name,
+      updatedAt: user.updatedAt,
+    };
   }
 
   async findByEmail(email: string): Promise<User | null> {

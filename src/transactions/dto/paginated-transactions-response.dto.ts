@@ -4,7 +4,8 @@ import { TransactionWithCategoryResponseDto } from './transaction-response.dto';
 export class TransactionPaginationMetaDto {
   @ApiProperty({
     example: 24,
-    description: 'Quantidade total de transacoes que correspondem aos filtros aplicados.',
+    description:
+      'Quantidade total de transacoes que correspondem aos filtros aplicados.',
   })
   total!: number;
 

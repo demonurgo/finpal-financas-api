@@ -17,6 +17,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -30,16 +31,31 @@ import {
 } from '../common/dto/api-error-response.dto';
 import type { User } from '../generated/prisma/client';
 
+const REGISTER_THROTTLE = {
+  default: {
+    limit: 3,
+    ttl: 60000,
+  },
+};
+
+const LOGIN_THROTTLE = {
+  default: {
+    limit: 5,
+    ttl: 60000,
+  },
+};
+
 @ApiTags('Autenticacao')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @Throttle(REGISTER_THROTTLE)
   @ApiOperation({
     summary: 'Cadastrar um novo usuario',
     description:
-      'Cria uma nova conta e retorna o perfil salvo sem expor o hash da senha.',
+      'Cria uma nova conta e retorna o perfil salvo sem expor o hash da senha. A rota aplica rate limit para reduzir abuso automatizado.',
   })
   @ApiCreatedResponse({
     description: 'Conta criada com sucesso.',
@@ -59,10 +75,11 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @Throttle(LOGIN_THROTTLE)
   @ApiOperation({
     summary: 'Entrar e obter o token JWT',
     description:
-      'Autentica o usuario com e-mail e senha e retorna um token JWT de acesso.',
+      'Autentica o usuario com e-mail e senha e retorna um token JWT de acesso. A rota aplica rate limit para reduzir tentativas de forca bruta.',
   })
   @ApiOkResponse({
     description: 'Token JWT gerado com sucesso.',
@@ -85,8 +102,7 @@ export class AuthController {
   @ApiBearerAuth('access-token')
   @ApiOperation({
     summary: 'Obter o perfil do usuario autenticado',
-    description:
-      'Retorna o usuario autenticado extraido do payload do JWT.',
+    description: 'Retorna o usuario autenticado extraido do payload do JWT.',
   })
   @ApiOkResponse({
     description: 'Perfil do usuario autenticado.',

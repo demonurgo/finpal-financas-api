@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import type { Server } from 'node:http';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { Pool } from 'pg';
@@ -17,6 +18,10 @@ type UserSeedInput = {
   password?: string;
 };
 
+type AuthTokenResponse = {
+  access_token: string;
+};
+
 type AuthenticatedUser = {
   token: string;
   user: {
@@ -28,7 +33,9 @@ type AuthenticatedUser = {
 
 export type E2eHarness = {
   app: INestApplication;
-  createAuthenticatedUser: (input?: UserSeedInput) => Promise<AuthenticatedUser>;
+  createAuthenticatedUser: (
+    input?: UserSeedInput,
+  ) => Promise<AuthenticatedUser>;
   databaseUrl: string;
   findSystemCategory: (name: string) => Promise<Category>;
   prisma: PrismaClient;
@@ -87,6 +94,8 @@ function setTestEnvironment(databaseUrl: string): () => void {
     JWT_SECRET: process.env.JWT_SECRET,
     NODE_ENV: process.env.NODE_ENV,
     PORT: process.env.PORT,
+    THROTTLE_LIMIT: process.env.THROTTLE_LIMIT,
+    THROTTLE_TTL_MS: process.env.THROTTLE_TTL_MS,
   };
 
   process.env.DATABASE_URL = databaseUrl;
@@ -94,6 +103,8 @@ function setTestEnvironment(databaseUrl: string): () => void {
   process.env.JWT_EXPIRES_IN = '1d';
   process.env.NODE_ENV = 'test';
   process.env.PORT = '0';
+  process.env.THROTTLE_LIMIT = '1000';
+  process.env.THROTTLE_TTL_MS = '60000';
 
   return () => {
     for (const [key, value] of Object.entries(originalValues)) {
@@ -116,7 +127,9 @@ async function getAvailablePort(): Promise<number> {
       const address = server.address();
 
       if (!address || typeof address === 'string') {
-        reject(new Error('Could not reserve a host port for the e2e database.'));
+        reject(
+          new Error('Could not reserve a host port for the e2e database.'),
+        );
         return;
       }
 
@@ -162,7 +175,7 @@ async function waitForHealthyContainer(containerName: string): Promise<void> {
   );
 }
 
-async function removeContainer(containerName?: string): Promise<void> {
+function removeContainer(containerName?: string): void {
   if (!containerName) {
     return;
   }
@@ -241,22 +254,24 @@ export async function createE2eHarness(): Promise<E2eHarness> {
           email: input.email ?? `user-${randomUUID()}@finpal.test`,
           password,
         };
+        const server = app.getHttpServer() as Server;
 
-        const registerResponse = await request(app.getHttpServer())
+        const registerResponse = await request(server)
           .post('/api/auth/register')
           .send(registerPayload)
           .expect(201);
 
-        const loginResponse = await request(app.getHttpServer())
+        const loginResponse = await request(server)
           .post('/api/auth/login')
           .send({
             email: registerPayload.email,
             password,
           })
           .expect(200);
+        const loginBody = loginResponse.body as AuthTokenResponse;
 
         return {
-          token: loginResponse.body.access_token as string,
+          token: loginBody.access_token,
           user: registerResponse.body as AuthenticatedUser['user'],
         };
       },
@@ -289,7 +304,7 @@ export async function createE2eHarness(): Promise<E2eHarness> {
         await app?.close();
         await prisma?.$disconnect();
         await pool?.end();
-        await removeContainer(containerName);
+        removeContainer(containerName);
         restoreEnvironment();
       },
     };
@@ -297,7 +312,7 @@ export async function createE2eHarness(): Promise<E2eHarness> {
     await app?.close();
     await prisma?.$disconnect();
     await pool?.end();
-    await removeContainer(containerName);
+    removeContainer(containerName);
     restoreEnvironment();
     throw error;
   }

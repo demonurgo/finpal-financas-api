@@ -183,12 +183,89 @@ describe('TransactionsService', () => {
     });
   });
 
+  it('lists transactions using a year-only date range when month is not informed', async () => {
+    prisma.transaction.findMany.mockResolvedValue([]);
+    prisma.transaction.count.mockResolvedValue(0);
+
+    await expect(
+      service.findAll('user-1', {
+        year: 2026,
+      }),
+    ).resolves.toEqual({
+      data: [],
+      meta: {
+        total: 0,
+        page: 1,
+        limit: 10,
+        totalPages: 0,
+      },
+    });
+
+    expect(prisma.transaction.findMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-1',
+        date: {
+          gte: new Date(2026, 0, 1),
+          lte: new Date(2026, 11, 31, 23, 59, 59, 999),
+        },
+      },
+      skip: 0,
+      take: 10,
+      orderBy: { date: 'desc' },
+      include: { category: true },
+    });
+  });
+
+  it('lists transactions without applying a date range when month and year are absent', async () => {
+    prisma.transaction.findMany.mockResolvedValue([{ id: 'transaction-1' }]);
+    prisma.transaction.count.mockResolvedValue(1);
+
+    await expect(service.findAll('user-1', {})).resolves.toEqual({
+      data: [{ id: 'transaction-1' }],
+      meta: {
+        total: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      },
+    });
+
+    expect(prisma.transaction.findMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+      skip: 0,
+      take: 10,
+      orderBy: { date: 'desc' },
+      include: { category: true },
+    });
+  });
+
   it('throws NotFoundException when a transaction is not found by id', async () => {
     prisma.transaction.findFirst.mockResolvedValue(null);
 
     await expect(
       service.findOne('transaction-1', 'user-1'),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('returns a transaction with category details when it exists', async () => {
+    const transaction = {
+      id: 'transaction-1',
+      type: 'INCOME',
+      category: {
+        id: 'category-1',
+        name: 'Salario',
+      },
+    };
+
+    prisma.transaction.findFirst.mockResolvedValue(transaction);
+
+    await expect(service.findOne('transaction-1', 'user-1')).resolves.toEqual(
+      transaction,
+    );
+    expect(prisma.transaction.findFirst).toHaveBeenCalledWith({
+      where: { id: 'transaction-1', userId: 'user-1' },
+      include: { category: true },
+    });
   });
 
   it('throws NotFoundException when updating a transaction the user does not own', async () => {
@@ -220,6 +297,7 @@ describe('TransactionsService', () => {
   it('throws BadRequestException when updating with a mismatched replacement category type', async () => {
     prisma.transaction.findFirst.mockResolvedValue({
       id: 'transaction-1',
+      categoryId: 'current-category',
       type: 'EXPENSE',
     });
     prisma.category.findFirst.mockResolvedValue({
@@ -236,6 +314,82 @@ describe('TransactionsService', () => {
     expect(prisma.transaction.update).not.toHaveBeenCalled();
   });
 
+  it('throws BadRequestException when updating only the transaction type and the current category no longer matches', async () => {
+    prisma.transaction.findFirst.mockResolvedValue({
+      id: 'transaction-1',
+      categoryId: 'current-category',
+      type: 'EXPENSE',
+    });
+    prisma.category.findFirst.mockResolvedValue({
+      id: 'current-category',
+      type: 'EXPENSE',
+      isSystem: true,
+    });
+
+    await expect(
+      service.update('transaction-1', 'user-1', {
+        type: 'INCOME',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.category.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'current-category',
+        OR: [{ isSystem: true }, { userId: 'user-1' }],
+      },
+    });
+    expect(prisma.transaction.update).not.toHaveBeenCalled();
+  });
+
+  it('updates only the transaction type when it remains compatible with the existing category', async () => {
+    prisma.transaction.findFirst.mockResolvedValue({
+      id: 'transaction-1',
+      categoryId: 'income-category',
+      type: 'INCOME',
+    });
+    prisma.category.findFirst.mockResolvedValue({
+      id: 'income-category',
+      type: 'INCOME',
+      isSystem: true,
+    });
+    prisma.transaction.update.mockResolvedValue({ id: 'transaction-1' });
+
+    await service.update('transaction-1', 'user-1', {
+      type: 'INCOME',
+      description: 'Pagamento atualizado',
+    });
+
+    expect(prisma.transaction.update).toHaveBeenCalledWith({
+      where: { id: 'transaction-1' },
+      data: {
+        type: 'INCOME',
+        description: 'Pagamento atualizado',
+        date: undefined,
+      },
+    });
+  });
+
+  it('updates fields unrelated to category validation without reloading category data', async () => {
+    prisma.transaction.findFirst.mockResolvedValue({
+      id: 'transaction-1',
+      categoryId: 'expense-category',
+      type: 'EXPENSE',
+    });
+    prisma.transaction.update.mockResolvedValue({ id: 'transaction-1' });
+
+    await service.update('transaction-1', 'user-1', {
+      description: 'Descricao simples',
+    });
+
+    expect(prisma.category.findFirst).not.toHaveBeenCalled();
+    expect(prisma.transaction.update).toHaveBeenCalledWith({
+      where: { id: 'transaction-1' },
+      data: {
+        description: 'Descricao simples',
+        date: undefined,
+      },
+    });
+  });
+
   it('updates a transaction and converts the explicit date string', async () => {
     const dto: UpdateTransactionDto = {
       categoryId: 'category-1',
@@ -246,6 +400,7 @@ describe('TransactionsService', () => {
 
     prisma.transaction.findFirst.mockResolvedValue({
       id: 'transaction-1',
+      categoryId: 'category-1',
       type: 'EXPENSE',
     });
     prisma.category.findFirst.mockResolvedValue({
@@ -307,6 +462,19 @@ describe('TransactionsService', () => {
       _sum: {
         amount: true,
       },
+    });
+  });
+
+  it('falls back to zero when grouped summary values are null', async () => {
+    prisma.transaction.groupBy.mockResolvedValue([
+      { type: 'INCOME', _sum: { amount: null } },
+      { type: 'EXPENSE', _sum: { amount: null } },
+    ]);
+
+    await expect(service.getSummary('user-1', {})).resolves.toEqual({
+      totalIncome: 0,
+      totalExpense: 0,
+      balance: 0,
     });
   });
 

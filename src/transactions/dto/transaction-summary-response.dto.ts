@@ -15,8 +15,7 @@ export class TransactionSummaryResponseDto {
 
   @ApiProperty({
     example: 3299.25,
-    description:
-      'Saldo atual calculado como totalIncome menos totalExpense.',
+    description: 'Saldo atual calculado como totalIncome menos totalExpense.',
   })
   balance!: number;
 }
