@@ -1,6 +1,6 @@
 {
   "name": "finpal-api",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Personal finance REST API built with NestJS, Prisma, and PostgreSQL.",
   "author": "",
   "private": true,
