@@ -17,11 +17,15 @@ FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
+COPY --from=deps /app/package*.json ./
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/prisma ./prisma
+COPY --from=deps /app/prisma.config.ts ./prisma.config.ts
 COPY --from=deps /app/src/generated ./src/generated
 COPY nest-cli.json ./
 COPY tsconfig.json ./
 COPY tsconfig.build.json ./
+COPY docker ./docker
 COPY src ./src
 
 RUN npm run build

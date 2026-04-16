@@ -17,6 +17,8 @@ describe('Docker hardening files', () => {
 
     expect(dockerfile).not.toContain('COPY . .');
     expect(dockerfile).toContain('COPY src ./src');
+    expect(dockerfile).toContain('COPY --from=deps /app/package*.json ./');
+    expect(dockerfile).toContain('COPY docker ./docker');
   });
 
   it('keeps demo data disabled by default and blocks it in production seeding', () => {
