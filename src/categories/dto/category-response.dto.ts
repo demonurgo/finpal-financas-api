@@ -33,7 +33,8 @@ export class CategoryResponseDto {
     example: 'a4d1c7fd-5ef5-4dcb-b275-df3fd90dd0f2',
     format: 'uuid',
     nullable: true,
-    description: 'Identificador do usuario dono. Categorias do sistema retornam null.',
+    description:
+      'Identificador do usuario dono. Categorias do sistema retornam null.',
   })
   userId!: string | null;
 

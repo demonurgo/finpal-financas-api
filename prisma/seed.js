@@ -88,6 +88,13 @@ async function ensureDefaultCategories() {
 }
 
 async function ensureSampleData(categoriesByName) {
+  if (
+    process.env.NODE_ENV === 'production' &&
+    process.env.SEED_SAMPLE_DATA === 'true'
+  ) {
+    throw new Error('SEED_SAMPLE_DATA deve permanecer false em producao.');
+  }
+
   if (process.env.SEED_SAMPLE_DATA !== 'true') {
     console.log('Pulando a carga opcional de dados de exemplo.');
     return;

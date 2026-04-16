@@ -4,6 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '../generated/prisma/client';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { FindTransactionsDto } from './dto/find-transactions.dto';
@@ -44,7 +45,7 @@ export class TransactionsService {
     const { page = 1, limit = 10, month, year, categoryId, type } = query;
     const skip = (page - 1) * limit;
 
-    const where: any = { userId };
+    const where: Prisma.TransactionWhereInput = { userId };
 
     if (categoryId) {
       where.categoryId = categoryId;
@@ -88,7 +89,7 @@ export class TransactionsService {
 
   async getSummary(userId: string, query: SummaryTransactionsDto) {
     const { month, year } = query;
-    const where: any = { userId };
+    const where: Prisma.TransactionWhereInput = { userId };
 
     if (month && year) {
       const startDate = new Date(year, month - 1, 1);
@@ -138,13 +139,18 @@ export class TransactionsService {
     });
     if (!trx) throw new NotFoundException('Transacao nao encontrada');
 
-    if (data.categoryId) {
+    if (data.categoryId || data.type) {
+      const effectiveCategoryId = data.categoryId ?? trx.categoryId;
       const category = await this.prisma.category.findFirst({
-        where: { id: data.categoryId, OR: [{ isSystem: true }, { userId }] },
+        where: {
+          id: effectiveCategoryId,
+          OR: [{ isSystem: true }, { userId }],
+        },
       });
+
       if (!category) throw new BadRequestException('Categoria invalida.');
 
-      const newType = data.type || trx.type;
+      const newType = data.type ?? trx.type;
       if (category.type !== newType) {
         throw new BadRequestException(
           'O tipo da transacao nao corresponde ao tipo da categoria.',

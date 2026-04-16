@@ -12,9 +12,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   ) {
     const secret = configService.get<string>('JWT_SECRET');
     if (!secret) {
-      throw new Error('JWT_SECRET deve estar definido nas variaveis de ambiente');
+      throw new Error(
+        'JWT_SECRET deve estar definido nas variaveis de ambiente',
+      );
     }
-    
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -27,7 +29,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user) {
       throw new UnauthorizedException('O usuario nao existe mais');
     }
-    const { password, ...result } = user;
-    return result;
+
+    return {
+      createdAt: user.createdAt,
+      email: user.email,
+      id: user.id,
+      name: user.name,
+      updatedAt: user.updatedAt,
+    };
   }
 }

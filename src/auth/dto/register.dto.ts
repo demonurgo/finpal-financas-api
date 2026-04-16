@@ -21,7 +21,8 @@ export class RegisterDto {
   @ApiProperty({
     example: 'SenhaForte123',
     minLength: 6,
-    description: 'Senha em texto puro que sera criptografada antes de ser salva.',
+    description:
+      'Senha em texto puro que sera criptografada antes de ser salva.',
   })
   @IsString({ message: 'senha deve ser um texto' })
   @MinLength(6, { message: 'senha deve ter no minimo 6 caracteres' })

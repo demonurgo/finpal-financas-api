@@ -51,7 +51,8 @@ export class CreateTransactionDto {
   @ApiProperty({
     example: '52f24fe2-76d7-48e7-b4ba-b4a76a0375e2',
     format: 'uuid',
-    description: 'Identificador de uma categoria compativel do sistema ou do usuario.',
+    description:
+      'Identificador de uma categoria compativel do sistema ou do usuario.',
   })
   @IsString({ message: 'categoryId deve ser um texto' })
   @IsNotEmpty({ message: 'categoryId e obrigatorio' })

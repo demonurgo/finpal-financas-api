@@ -220,6 +220,7 @@ describe('TransactionsService', () => {
   it('throws BadRequestException when updating with a mismatched replacement category type', async () => {
     prisma.transaction.findFirst.mockResolvedValue({
       id: 'transaction-1',
+      categoryId: 'current-category',
       type: 'EXPENSE',
     });
     prisma.category.findFirst.mockResolvedValue({
@@ -236,6 +237,60 @@ describe('TransactionsService', () => {
     expect(prisma.transaction.update).not.toHaveBeenCalled();
   });
 
+  it('throws BadRequestException when updating only the transaction type and the current category no longer matches', async () => {
+    prisma.transaction.findFirst.mockResolvedValue({
+      id: 'transaction-1',
+      categoryId: 'current-category',
+      type: 'EXPENSE',
+    });
+    prisma.category.findFirst.mockResolvedValue({
+      id: 'current-category',
+      type: 'EXPENSE',
+      isSystem: true,
+    });
+
+    await expect(
+      service.update('transaction-1', 'user-1', {
+        type: 'INCOME',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.category.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'current-category',
+        OR: [{ isSystem: true }, { userId: 'user-1' }],
+      },
+    });
+    expect(prisma.transaction.update).not.toHaveBeenCalled();
+  });
+
+  it('updates only the transaction type when it remains compatible with the existing category', async () => {
+    prisma.transaction.findFirst.mockResolvedValue({
+      id: 'transaction-1',
+      categoryId: 'income-category',
+      type: 'INCOME',
+    });
+    prisma.category.findFirst.mockResolvedValue({
+      id: 'income-category',
+      type: 'INCOME',
+      isSystem: true,
+    });
+    prisma.transaction.update.mockResolvedValue({ id: 'transaction-1' });
+
+    await service.update('transaction-1', 'user-1', {
+      type: 'INCOME',
+      description: 'Pagamento atualizado',
+    });
+
+    expect(prisma.transaction.update).toHaveBeenCalledWith({
+      where: { id: 'transaction-1' },
+      data: {
+        type: 'INCOME',
+        description: 'Pagamento atualizado',
+        date: undefined,
+      },
+    });
+  });
+
   it('updates a transaction and converts the explicit date string', async () => {
     const dto: UpdateTransactionDto = {
       categoryId: 'category-1',
@@ -246,6 +301,7 @@ describe('TransactionsService', () => {
 
     prisma.transaction.findFirst.mockResolvedValue({
       id: 'transaction-1',
+      categoryId: 'category-1',
       type: 'EXPENSE',
     });
     prisma.category.findFirst.mockResolvedValue({

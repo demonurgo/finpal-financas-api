@@ -1,16 +1,34 @@
+import type { Server } from 'node:http';
 import request from 'supertest';
 import { createE2eHarness, E2eHarness } from './e2e-harness';
 
 const EXPECTED_SYSTEM_CATEGORIES = [
-  'Alimentação',
-  'Educação',
+  'Alimenta\u00e7\u00e3o',
+  'Educa\u00e7\u00e3o',
   'Lazer',
   'Moradia',
   'Outros',
-  'Salário',
-  'Saúde',
+  'Sal\u00e1rio',
+  'Sa\u00fade',
   'Transporte',
 ];
+
+type AuthTokenResponse = {
+  access_token: string;
+};
+
+type CategoryResponse = {
+  id: string;
+  isSystem: boolean;
+  name: string;
+  type: 'INCOME' | 'EXPENSE';
+};
+
+type UserResponse = {
+  email: string;
+  id: string;
+  name: string;
+};
 
 describe('Auth and categories flows (e2e)', () => {
   let harness: E2eHarness;
@@ -30,6 +48,7 @@ describe('Auth and categories flows (e2e)', () => {
   });
 
   it('registers, logs in, returns the current user, and rejects protected access without a token', async () => {
+    const server = harness.app.getHttpServer() as Server;
     const password = 'strongPassword123';
     const registerPayload = {
       email: 'maria.souza@example.com',
@@ -37,58 +56,64 @@ describe('Auth and categories flows (e2e)', () => {
       password,
     };
 
-    const registerResponse = await request(harness.app.getHttpServer())
+    const registerResponse = await request(server)
       .post('/api/auth/register')
       .send(registerPayload)
       .expect(201);
+    const registerBody = registerResponse.body as UserResponse;
 
-    expect(registerResponse.body).toMatchObject({
+    expect(registerBody).toMatchObject({
       email: registerPayload.email,
       name: registerPayload.name,
     });
-    expect(registerResponse.body).not.toHaveProperty('password');
+    expect(registerBody).not.toHaveProperty('password');
 
-    const loginResponse = await request(harness.app.getHttpServer())
+    const loginResponse = await request(server)
       .post('/api/auth/login')
       .send({
         email: registerPayload.email,
         password,
       })
       .expect(200);
+    const loginBody = loginResponse.body as AuthTokenResponse;
 
-    expect(loginResponse.body.access_token).toEqual(expect.any(String));
+    expect(loginBody.access_token).toEqual(expect.any(String));
 
-    await request(harness.app.getHttpServer()).get('/api/auth/me').expect(401);
+    await request(server).get('/api/auth/me').expect(401);
 
-    const profileResponse = await request(harness.app.getHttpServer())
+    const profileResponse = await request(server)
       .get('/api/auth/me')
-      .set('Authorization', `Bearer ${loginResponse.body.access_token}`)
+      .set('Authorization', `Bearer ${loginBody.access_token}`)
       .expect(200);
+    const profileBody = profileResponse.body as UserResponse;
 
-    expect(profileResponse.body).toMatchObject({
+    expect(profileBody).toMatchObject({
       email: registerPayload.email,
-      id: registerResponse.body.id,
+      id: registerBody.id,
       name: registerPayload.name,
     });
   });
 
   it('lists seeded categories and manages the full custom category lifecycle', async () => {
+    const server = harness.app.getHttpServer() as Server;
     const { token } = await harness.createAuthenticatedUser();
 
-    const initialCategoriesResponse = await request(harness.app.getHttpServer())
+    const initialCategoriesResponse = await request(server)
       .get('/api/categories')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
+    const initialCategories =
+      initialCategoriesResponse.body as CategoryResponse[];
 
-    expect(initialCategoriesResponse.body).toHaveLength(8);
+    expect(initialCategories).toHaveLength(8);
     expect(
-      initialCategoriesResponse.body
-        .filter((category: { isSystem: boolean }) => category.isSystem)
-        .map((category: { name: string }) => category.name)
+      initialCategories
+        .filter((category) => category.isSystem)
+        .map((category) => category.name)
         .sort(),
     ).toEqual([...EXPECTED_SYSTEM_CATEGORIES].sort());
 
-    const createdCategoryResponse = await request(harness.app.getHttpServer())
+    const createdCategoryResponse = await request(server)
       .post('/api/categories')
       .set('Authorization', `Bearer ${token}`)
       .send({
@@ -96,51 +121,52 @@ describe('Auth and categories flows (e2e)', () => {
         type: 'INCOME',
       })
       .expect(201);
+    const createdCategory = createdCategoryResponse.body as CategoryResponse;
 
-    expect(createdCategoryResponse.body).toMatchObject({
+    expect(createdCategory).toMatchObject({
       isSystem: false,
       name: 'Freelance',
       type: 'INCOME',
     });
 
-    const updatedCategoryResponse = await request(harness.app.getHttpServer())
-      .patch(`/api/categories/${createdCategoryResponse.body.id}`)
+    const updatedCategoryResponse = await request(server)
+      .patch(`/api/categories/${createdCategory.id}`)
       .set('Authorization', `Bearer ${token}`)
       .send({
         name: 'Projetos',
       })
       .expect(200);
+    const updatedCategory = updatedCategoryResponse.body as CategoryResponse;
 
-    expect(updatedCategoryResponse.body).toMatchObject({
-      id: createdCategoryResponse.body.id,
+    expect(updatedCategory).toMatchObject({
+      id: createdCategory.id,
       name: 'Projetos',
       type: 'INCOME',
     });
 
-    const listWithCustomCategoryResponse = await request(
-      harness.app.getHttpServer(),
-    )
+    const listWithCustomCategoryResponse = await request(server)
       .get('/api/categories')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
+    const listWithCustomCategory =
+      listWithCustomCategoryResponse.body as CategoryResponse[];
 
-    expect(listWithCustomCategoryResponse.body).toHaveLength(9);
+    expect(listWithCustomCategory).toHaveLength(9);
 
-    await request(harness.app.getHttpServer())
-      .delete(`/api/categories/${createdCategoryResponse.body.id}`)
+    await request(server)
+      .delete(`/api/categories/${createdCategory.id}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
-    const finalCategoriesResponse = await request(harness.app.getHttpServer())
+    const finalCategoriesResponse = await request(server)
       .get('/api/categories')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
+    const finalCategories = finalCategoriesResponse.body as CategoryResponse[];
 
-    expect(finalCategoriesResponse.body).toHaveLength(8);
+    expect(finalCategories).toHaveLength(8);
     expect(
-      finalCategoriesResponse.body.some(
-        (category: { name: string }) => category.name === 'Projetos',
-      ),
+      finalCategories.some((category) => category.name === 'Projetos'),
     ).toBe(false);
   });
 });

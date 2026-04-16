@@ -1,5 +1,35 @@
+import type { Server } from 'node:http';
 import request from 'supertest';
 import { createE2eHarness, E2eHarness } from './e2e-harness';
+
+type PaginationMeta = {
+  limit: number;
+  page: number;
+  total: number;
+  totalPages: number;
+};
+
+type TransactionResponse = {
+  amount: number | string;
+  category?: {
+    id: string;
+    name: string;
+  };
+  description: string;
+  id: string;
+  type: 'INCOME' | 'EXPENSE';
+};
+
+type PaginatedTransactionsResponse = {
+  data: TransactionResponse[];
+  meta: PaginationMeta;
+};
+
+type SummaryResponse = {
+  balance: number;
+  totalExpense: number;
+  totalIncome: number;
+};
 
 describe('Transactions and summary flows (e2e)', () => {
   let harness: E2eHarness;
@@ -19,6 +49,7 @@ describe('Transactions and summary flows (e2e)', () => {
   });
 
   it('covers transaction CRUD, filtered listing, and summary calculations with user isolation', async () => {
+    const server = harness.app.getHttpServer() as Server;
     const { token } = await harness.createAuthenticatedUser({
       email: 'ana.silva@example.com',
       name: 'Ana Silva',
@@ -28,22 +59,25 @@ describe('Transactions and summary flows (e2e)', () => {
       name: 'Joao Silva',
     });
 
-    const incomeCategory = await harness.findSystemCategory('Salário');
-    const expenseCategory = await harness.findSystemCategory('Alimentação');
+    const incomeCategory = await harness.findSystemCategory('Sal\u00e1rio');
+    const expenseCategory = await harness.findSystemCategory(
+      'Alimenta\u00e7\u00e3o',
+    );
 
-    const incomeResponse = await request(harness.app.getHttpServer())
+    const incomeResponse = await request(server)
       .post('/api/transactions')
       .set('Authorization', `Bearer ${token}`)
       .send({
         amount: 5000,
         categoryId: incomeCategory.id,
         date: '2026-04-05T10:00:00.000Z',
-        description: 'Salário de abril',
+        description: 'Salario de abril',
         type: 'INCOME',
       })
       .expect(201);
+    const incomeTransaction = incomeResponse.body as TransactionResponse;
 
-    const aprilExpenseResponse = await request(harness.app.getHttpServer())
+    const aprilExpenseResponse = await request(server)
       .post('/api/transactions')
       .set('Authorization', `Bearer ${token}`)
       .send({
@@ -54,8 +88,9 @@ describe('Transactions and summary flows (e2e)', () => {
         type: 'EXPENSE',
       })
       .expect(201);
+    const aprilExpense = aprilExpenseResponse.body as TransactionResponse;
 
-    const marchExpenseResponse = await request(harness.app.getHttpServer())
+    const marchExpenseResponse = await request(server)
       .post('/api/transactions')
       .set('Authorization', `Bearer ${token}`)
       .send({
@@ -66,8 +101,9 @@ describe('Transactions and summary flows (e2e)', () => {
         type: 'EXPENSE',
       })
       .expect(201);
+    const marchExpense = marchExpenseResponse.body as TransactionResponse;
 
-    await request(harness.app.getHttpServer())
+    await request(server)
       .post('/api/transactions')
       .set('Authorization', `Bearer ${otherUser.token}`)
       .send({
@@ -79,28 +115,30 @@ describe('Transactions and summary flows (e2e)', () => {
       })
       .expect(201);
 
-    const filteredListResponse = await request(harness.app.getHttpServer())
+    const filteredListResponse = await request(server)
       .get(
         `/api/transactions?type=EXPENSE&categoryId=${expenseCategory.id}&month=4&year=2026&page=1&limit=5`,
       )
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
+    const filteredList =
+      filteredListResponse.body as PaginatedTransactionsResponse;
 
-    expect(filteredListResponse.body.meta).toMatchObject({
+    expect(filteredList.meta).toMatchObject({
       limit: 5,
       page: 1,
       total: 1,
       totalPages: 1,
     });
-    expect(filteredListResponse.body.data).toHaveLength(1);
-    expect(filteredListResponse.body.data[0]).toMatchObject({
+    expect(filteredList.data).toHaveLength(1);
+    expect(filteredList.data[0]).toMatchObject({
       description: 'Mercado mensal',
-      id: aprilExpenseResponse.body.id,
+      id: aprilExpense.id,
       type: 'EXPENSE',
     });
 
-    const updatedTransactionResponse = await request(harness.app.getHttpServer())
-      .patch(`/api/transactions/${aprilExpenseResponse.body.id}`)
+    const updatedTransactionResponse = await request(server)
+      .patch(`/api/transactions/${aprilExpense.id}`)
       .set('Authorization', `Bearer ${token}`)
       .send({
         amount: 200,
@@ -108,55 +146,60 @@ describe('Transactions and summary flows (e2e)', () => {
         description: 'Mercado atualizado',
       })
       .expect(200);
+    const updatedTransaction =
+      updatedTransactionResponse.body as TransactionResponse;
 
-    expect(updatedTransactionResponse.body.description).toBe('Mercado atualizado');
-    expect(Number(updatedTransactionResponse.body.amount)).toBe(200);
+    expect(updatedTransaction.description).toBe('Mercado atualizado');
+    expect(Number(updatedTransaction.amount)).toBe(200);
 
-    const detailResponse = await request(harness.app.getHttpServer())
-      .get(`/api/transactions/${incomeResponse.body.id}`)
+    const detailResponse = await request(server)
+      .get(`/api/transactions/${incomeTransaction.id}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
+    const detail = detailResponse.body as TransactionResponse;
 
-    expect(detailResponse.body).toMatchObject({
-      description: 'Salário de abril',
-      id: incomeResponse.body.id,
+    expect(detail).toMatchObject({
+      description: 'Salario de abril',
+      id: incomeTransaction.id,
       type: 'INCOME',
     });
-    expect(detailResponse.body.category).toMatchObject({
+    expect(detail.category).toMatchObject({
       id: incomeCategory.id,
-      name: 'Salário',
+      name: 'Sal\u00e1rio',
     });
 
-    const summaryResponse = await request(harness.app.getHttpServer())
+    const summaryResponse = await request(server)
       .get('/api/transactions/summary?month=4&year=2026')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
+    const summary = summaryResponse.body as SummaryResponse;
 
-    expect(summaryResponse.body).toEqual({
+    expect(summary).toEqual({
       balance: 4800,
       totalExpense: 200,
       totalIncome: 5000,
     });
 
-    await request(harness.app.getHttpServer())
-      .delete(`/api/transactions/${marchExpenseResponse.body.id}`)
+    await request(server)
+      .delete(`/api/transactions/${marchExpense.id}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
-    await request(harness.app.getHttpServer())
-      .get(`/api/transactions/${marchExpenseResponse.body.id}`)
+    await request(server)
+      .get(`/api/transactions/${marchExpense.id}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(404);
 
-    const finalListResponse = await request(harness.app.getHttpServer())
+    const finalListResponse = await request(server)
       .get('/api/transactions?page=1&limit=10')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
+    const finalList = finalListResponse.body as PaginatedTransactionsResponse;
 
-    expect(finalListResponse.body.meta).toMatchObject({
+    expect(finalList.meta).toMatchObject({
       total: 2,
       totalPages: 1,
     });
-    expect(finalListResponse.body.data).toHaveLength(2);
+    expect(finalList.data).toHaveLength(2);
   });
 });

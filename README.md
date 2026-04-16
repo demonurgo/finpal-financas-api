@@ -56,7 +56,13 @@ Antes de usar fora de desenvolvimento, altere pelo menos:
 
 - `JWT_SECRET`
 - credenciais do PostgreSQL, se necessário
-- `SEED_SAMPLE_DATA`, caso não queira usuário demo e dados de exemplo
+- `SEED_SAMPLE_DATA`, se você quiser habilitar dados de exemplo em ambiente local
+
+Regras de segurança desta versão:
+
+- a API não sobe em produção com `JWT_SECRET` padrão
+- a API não sobe em produção com `SEED_SAMPLE_DATA=true`
+- login e cadastro possuem rate limit para reduzir tentativas automatizadas
 
 Os dados do banco ficam no volume Docker `projeto-nassau_postgres_data`.
 
@@ -124,6 +130,8 @@ Se `SEED_SAMPLE_DATA=true`, o seed também cria:
 - usuário: `demo@finpal.local`
 - senha: `demo123456`
 - algumas transações de exemplo
+
+Em produção, mantenha `SEED_SAMPLE_DATA=false`.
 
 ## Como usar a API
 
@@ -198,6 +206,7 @@ Regras importantes:
 - `npm run docker:down:volumes` apaga os dados persistidos
 - `npm run docker:rebuild:clean` refaz a imagem da app sem apagar o banco
 - `npm run docker:recover` ajuda quando o cache de build do Docker quebra
+- o contexto de build do Docker ignora arquivos `.env` locais
 
 ## Testes
 
@@ -227,6 +236,10 @@ Os testes e2e sobem um PostgreSQL descartável em Docker.
 | `npm run docker:up:build` | Subir stack Docker com rebuild |
 | `npm run docker:db` | Subir só o PostgreSQL |
 | `npm run docker:down` | Parar stack sem apagar banco |
+
+## Checklist técnico
+
+Existe um checklist técnico de hardening em [docs/technical-checklist.md](./docs/technical-checklist.md).
 
 ## Estrutura resumida
 
