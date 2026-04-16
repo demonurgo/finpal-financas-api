@@ -42,16 +42,16 @@ describe('AuthService', () => {
     jest.clearAllMocks();
   });
 
-  it('hashes the password before creating a user', async () => {
+  it('hashes the password and normalizes registration fields before creating a user', async () => {
     const registerDto: RegisterDto = {
-      name: 'Maria Souza',
-      email: 'maria@example.com',
+      name: '  Maria Souza  ',
+      email: '  Maria@Example.com  ',
       password: 'plain-password',
     };
     const createdUser = {
       id: 'user-1',
-      name: registerDto.name,
-      email: registerDto.email,
+      name: 'Maria Souza',
+      email: 'maria@example.com',
       createdAt: new Date('2026-04-15T12:00:00.000Z'),
       updatedAt: new Date('2026-04-15T12:00:00.000Z'),
     };
@@ -64,6 +64,8 @@ describe('AuthService', () => {
     expect(bcrypt.hash).toHaveBeenCalledWith(registerDto.password, 10);
     expect(usersService.create).toHaveBeenCalledWith({
       ...registerDto,
+      email: 'maria@example.com',
+      name: 'Maria Souza',
       password: 'hashed-password',
     });
   });
@@ -86,7 +88,7 @@ describe('AuthService', () => {
 
   it('throws UnauthorizedException when login user is not found', async () => {
     const loginDto: LoginDto = {
-      email: 'missing@example.com',
+      email: ' Missing@Example.com ',
       password: 'plain-password',
     };
 
@@ -94,6 +96,9 @@ describe('AuthService', () => {
 
     await expect(service.login(loginDto)).rejects.toBeInstanceOf(
       UnauthorizedException,
+    );
+    expect(usersService.findByEmail).toHaveBeenCalledWith(
+      'missing@example.com',
     );
     expect(jwtService.sign).not.toHaveBeenCalled();
   });

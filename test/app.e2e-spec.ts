@@ -21,11 +21,17 @@ describe('App bootstrap (e2e)', () => {
   });
 
   afterEach(async () => {
-    await harness.stop();
+    await harness?.stop();
   });
 
   it('boots with a disposable PostgreSQL database and seeds the system categories', async () => {
     const server = harness.app.getHttpServer() as Server;
+    const healthResponse = await request(server).get('/api/health').expect(200);
+    expect(healthResponse.body).toMatchObject({
+      database: 'up',
+      status: 'up',
+    });
+
     const response = await request(server).get('/api/auth/me').expect(401);
 
     expect(response.body).toMatchObject({

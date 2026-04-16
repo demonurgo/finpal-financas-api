@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -40,6 +41,17 @@ export class CategoriesService {
 
   async remove(id: string, userId: string) {
     await this.ensureMutableCategory(id, userId);
+
+    const linkedTransactions = await this.prisma.transaction.count({
+      where: { categoryId: id },
+    });
+
+    if (linkedTransactions > 0) {
+      throw new ConflictException(
+        'A categoria nao pode ser excluida porque possui transacoes vinculadas.',
+      );
+    }
+
     return this.prisma.category.delete({
       where: { id },
     });

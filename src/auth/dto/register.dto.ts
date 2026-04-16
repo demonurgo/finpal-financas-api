@@ -1,11 +1,21 @@
+import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+
+function trimString(value: unknown): unknown {
+  return typeof value === 'string' ? value.trim() : value;
+}
+
+function normalizeEmail(value: unknown): unknown {
+  return typeof value === 'string' ? value.trim().toLowerCase() : value;
+}
 
 export class RegisterDto {
   @ApiProperty({
     example: 'Maria Souza',
     description: 'Nome completo exibido no perfil do usuario.',
   })
+  @Transform(({ value }: { value: unknown }) => trimString(value))
   @IsString({ message: 'nome deve ser um texto' })
   @IsNotEmpty({ message: 'nome e obrigatorio' })
   name!: string;
@@ -14,6 +24,7 @@ export class RegisterDto {
     example: 'maria.souza@example.com',
     description: 'Endereco de e-mail unico usado para autenticar a conta.',
   })
+  @Transform(({ value }: { value: unknown }) => normalizeEmail(value))
   @IsEmail({}, { message: 'email deve ser um endereco de e-mail valido' })
   @IsNotEmpty({ message: 'email e obrigatorio' })
   email!: string;

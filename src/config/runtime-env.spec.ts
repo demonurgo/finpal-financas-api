@@ -38,4 +38,14 @@ describe('runtime environment validation', () => {
       }),
     ).toThrow('SEED_SAMPLE_DATA deve permanecer false em producao');
   });
+
+  it('throws when the production JWT secret is too short', () => {
+    expect(() =>
+      validateRuntimeEnvironment({
+        JWT_SECRET: 'segredo-curto',
+        NODE_ENV: 'production',
+        SEED_SAMPLE_DATA: 'false',
+      }),
+    ).toThrow('JWT_SECRET deve ter pelo menos 32 caracteres em producao.');
+  });
 });

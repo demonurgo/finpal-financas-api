@@ -3,7 +3,7 @@ import {
   IsEnum,
   IsNumber,
   IsOptional,
-  IsString,
+  IsUUID,
   Max,
   Min,
 } from 'class-validator';
@@ -68,7 +68,7 @@ export class FindTransactionsDto {
     description: 'Filtra as transacoes pelo identificador da categoria.',
   })
   @IsOptional()
-  @IsString({ message: 'categoryId deve ser um texto' })
+  @IsUUID('4', { message: 'categoryId deve ser um UUID valido' })
   categoryId?: string;
 
   @ApiPropertyOptional({

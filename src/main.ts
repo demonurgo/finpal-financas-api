@@ -8,6 +8,7 @@ async function bootstrap(): Promise<void> {
 
   const app = await NestFactory.create(AppModule);
 
+  app.enableShutdownHooks();
   configureApp(app);
   setupSwagger(app);
 

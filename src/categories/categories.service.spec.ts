@@ -1,4 +1,8 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { TransactionType } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CategoriesService } from './categories.service';
@@ -13,9 +17,16 @@ type CategoryPrismaMock = {
   delete: jest.Mock;
 };
 
+type TransactionPrismaMock = {
+  count: jest.Mock;
+};
+
 describe('CategoriesService', () => {
   let service: CategoriesService;
-  let prisma: { category: CategoryPrismaMock };
+  let prisma: {
+    category: CategoryPrismaMock;
+    transaction: TransactionPrismaMock;
+  };
 
   beforeEach(() => {
     prisma = {
@@ -25,6 +36,9 @@ describe('CategoriesService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
+      },
+      transaction: {
+        count: jest.fn(),
       },
     };
 
@@ -149,14 +163,34 @@ describe('CategoriesService', () => {
     };
 
     prisma.category.findUnique.mockResolvedValue(deletedCategory);
+    prisma.transaction.count.mockResolvedValue(0);
     prisma.category.delete.mockResolvedValue(deletedCategory);
 
     await expect(service.remove('category-1', userId)).resolves.toEqual(
       deletedCategory,
     );
+    expect(prisma.transaction.count).toHaveBeenCalledWith({
+      where: { categoryId: 'category-1' },
+    });
     expect(prisma.category.delete).toHaveBeenCalledWith({
       where: { id: 'category-1' },
     });
+  });
+
+  it('throws ConflictException when removing a category with linked transactions', async () => {
+    prisma.category.findUnique.mockResolvedValue({
+      id: 'category-1',
+      name: 'Freelance',
+      type: TransactionType.INCOME,
+      isSystem: false,
+      userId: 'user-1',
+    });
+    prisma.transaction.count.mockResolvedValue(2);
+
+    await expect(service.remove('category-1', 'user-1')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(prisma.category.delete).not.toHaveBeenCalled();
   });
 
   it('throws NotFoundException when removing a foreign category', async () => {

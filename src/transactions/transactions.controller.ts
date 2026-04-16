@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Patch,
+  ParseUUIDPipe,
   Post,
   Query,
   UseGuards,
@@ -143,7 +144,10 @@ export class TransactionsController {
     description: 'Token Bearer ausente, invalido ou expirado.',
     type: ApiErrorResponseDto,
   })
-  findOne(@Param('id') id: string, @CurrentUser() user: User) {
+  findOne(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() user: User,
+  ) {
     return this.transactionsService.findOne(id, user.id);
   }
 
@@ -176,7 +180,7 @@ export class TransactionsController {
     type: ApiErrorResponseDto,
   })
   update(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: User,
     @Body() updateTransactionDto: UpdateTransactionDto,
   ) {
@@ -206,7 +210,10 @@ export class TransactionsController {
     description: 'Token Bearer ausente, invalido ou expirado.',
     type: ApiErrorResponseDto,
   })
-  remove(@Param('id') id: string, @CurrentUser() user: User) {
+  remove(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() user: User,
+  ) {
     return this.transactionsService.remove(id, user.id);
   }
 }

@@ -5,12 +5,14 @@ import {
   Get,
   Param,
   Patch,
+  ParseUUIDPipe,
   Post,
   UseGuards,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -116,7 +118,7 @@ export class CategoriesController {
     type: ApiErrorResponseDto,
   })
   update(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: User,
     @Body() updateCategoryDto: UpdateCategoryDto,
   ) {
@@ -138,6 +140,15 @@ export class CategoriesController {
     description: 'Categoria excluida com sucesso.',
     type: CategoryResponseDto,
   })
+  @ApiBadRequestResponse({
+    description: 'O identificador informado e invalido.',
+    type: ApiErrorResponseDto,
+  })
+  @ApiConflictResponse({
+    description:
+      'A categoria possui transacoes vinculadas e nao pode ser excluida.',
+    type: ApiErrorResponseDto,
+  })
   @ApiForbiddenResponse({
     description: 'Categorias do sistema nao podem ser excluidas.',
     type: ApiErrorResponseDto,
@@ -151,7 +162,10 @@ export class CategoriesController {
     description: 'Token Bearer ausente, invalido ou expirado.',
     type: ApiErrorResponseDto,
   })
-  remove(@Param('id') id: string, @CurrentUser() user: User) {
+  remove(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() user: User,
+  ) {
     return this.categoriesService.remove(id, user.id);
   }
 }

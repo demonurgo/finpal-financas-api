@@ -7,6 +7,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { CategoriesModule } from './categories/categories.module';
+import { HealthModule } from './health/health.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { readPositiveInteger } from './config/runtime-env';
 
@@ -37,6 +38,7 @@ import { readPositiveInteger } from './config/runtime-env';
     PrismaModule,
     UsersModule,
     AuthModule,
+    HealthModule,
     CategoriesModule,
     TransactionsModule,
   ],

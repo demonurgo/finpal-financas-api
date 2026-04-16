@@ -45,7 +45,7 @@ describe('Transactions and summary flows (e2e)', () => {
   });
 
   afterEach(async () => {
-    await harness.stop();
+    await harness?.stop();
   });
 
   it('covers transaction CRUD, filtered listing, and summary calculations with user isolation', async () => {
@@ -313,5 +313,72 @@ describe('Transactions and summary flows (e2e)', () => {
       error: 'Nao encontrado',
       statusCode: 404,
     });
+  });
+
+  it('rejects invalid UUID parameters and identifiers on transaction routes', async () => {
+    const server = harness.app.getHttpServer() as Server;
+    const { token } = await harness.createAuthenticatedUser({
+      email: 'uuid-check@example.com',
+      name: 'UUID Check',
+    });
+    const expenseCategory = await harness.findSystemCategory(
+      'Alimenta\u00e7\u00e3o',
+    );
+
+    const invalidCategoryIdResponse = await request(server)
+      .post('/api/transactions')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        amount: 10,
+        categoryId: 'invalid-uuid',
+        description: 'UUID invalido',
+        type: 'EXPENSE',
+      })
+      .expect(400);
+    const invalidCategoryIdBody =
+      invalidCategoryIdResponse.body as ErrorResponse;
+
+    expect(invalidCategoryIdBody).toMatchObject({
+      error: 'Requisicao invalida',
+      statusCode: 400,
+    });
+
+    const transactionResponse = await request(server)
+      .post('/api/transactions')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        amount: 25,
+        categoryId: expenseCategory.id,
+        description: 'Transacao valida',
+        type: 'EXPENSE',
+      })
+      .expect(201);
+    const transaction = transactionResponse.body as TransactionResponse;
+
+    await request(server)
+      .get('/api/transactions/invalid-uuid')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(400);
+
+    await request(server)
+      .patch('/api/transactions/invalid-uuid')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        description: 'Nao importa',
+      })
+      .expect(400);
+
+    await request(server)
+      .delete('/api/transactions/invalid-uuid')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(400);
+
+    await request(server)
+      .patch(`/api/transactions/${transaction.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        categoryId: 'invalid-uuid',
+      })
+      .expect(400);
   });
 });
